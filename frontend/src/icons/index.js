@@ -16,3 +16,4 @@ export { default as SunIcon } from "./SunIcon.jsx";
 export { default as MoonIcon } from "./MoonIcon.jsx";
 export { default as DownloadIcon } from "./DownloadIcon.jsx";
 export { default as SparklesIcon } from "./SparklesIcon.jsx";
+export { default as GithubIcon } from "./GithubIcon.jsx";

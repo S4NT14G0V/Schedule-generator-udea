@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { HorariosService } from "@/services/horarios.service.js";
 import { useMateriasStore } from "@/store/materias.store.js";
 import { MOCK_DATA } from "@/data/materias.mock.js";
+import { GithubIcon } from "@/icons/index.js";
 
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA !== "false";
 const MOCK_FACULTADES = [
@@ -214,8 +215,8 @@ function ProgramSelectorComponent({ onMenuOpenChange }) {
   );
 
   return (
-    <div className="h-full w-full flex flex-col items-center justify-center px-6 sm:px-14 overflow-hidden relative select-none">
-      <div className="w-full h-full max-w-md flex flex-col relative justify-center overflow-hidden">
+    <div className="h-full w-full flex flex-col items-center justify-between px-6 sm:px-14 py-8 overflow-y-auto relative select-none">
+      <div className="w-full flex-1 max-w-md flex flex-col justify-center">
         {/* Formulario */}
         <div className="relative z-10 space-y-4">
           <h3 className="text-sm font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider text-center">
@@ -294,6 +295,22 @@ function ProgramSelectorComponent({ onMenuOpenChange }) {
             )}
           </button>
         </div>
+      </div>
+
+      {/* Enlace para colaborar en GitHub */}
+      <div className="w-full max-w-md pt-6 flex flex-col items-center justify-center text-center">
+        <a
+          href="https://github.com/S4NT14G0V/Schedule-generator-udea"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all text-xs duration-200 shadow-2xs"
+        >
+          <GithubIcon className="w-4 h-4 text-zinc-500 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors" />
+          <span className="text-[11px] text-zinc-400 dark:text-zinc-500 group-hover:text-primary transition-colors font-mono">
+            GitHub
+          </span>
+          <span className="font-medium">¿Quieres colaborar?</span>
+        </a>
       </div>
     </div>
   );
