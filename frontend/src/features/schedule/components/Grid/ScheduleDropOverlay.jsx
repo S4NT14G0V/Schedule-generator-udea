@@ -15,7 +15,18 @@ function ScheduleDropOverlayComponent({
   showToastMessage,
   celdasMateria,
 }) {
-  const { draggingMateria, clearDragState } = useMateriasStore();
+  const {
+    draggingMateria,
+    hoveredMateria,
+    materiasSeleccionadas,
+    clearDragState,
+    selectGrupo,
+    toggleMateriaSelected,
+    setShowGrupoSelector,
+    clearHoveredMateria,
+  } = useMateriasStore();
+
+  const isDragging = Boolean(draggingMateria);
 
   const handleBackdropDrop = useCallback(
     (e) => {
@@ -79,11 +90,15 @@ function ScheduleDropOverlayComponent({
                 horaInicioIndex,
                 duracion,
                 grupos: [horario.numeroGrupo],
+                isFilteredMatch: Boolean(horario.isFilteredMatch),
               });
             } else {
               const existing = slotMap.get(slotKey);
               if (!existing.grupos.includes(horario.numeroGrupo)) {
                 existing.grupos.push(horario.numeroGrupo);
+              }
+              if (horario.isFilteredMatch) {
+                existing.isFilteredMatch = true;
               }
             }
           }
@@ -117,13 +132,17 @@ function ScheduleDropOverlayComponent({
           gridColumn: "2 / span 7",
           gridRow: "1 / -1",
           zIndex: 12,
-          pointerEvents: "auto",
+          pointerEvents: isDragging ? "auto" : "none",
         }}
-        onDrop={handleBackdropDrop}
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
-        }}
+        onDrop={isDragging ? handleBackdropDrop : undefined}
+        onDragOver={
+          isDragging
+            ? (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }
+            : undefined
+        }
       />
 
       <AnimatePresence>
@@ -138,13 +157,40 @@ function ScheduleDropOverlayComponent({
               delay: idx * 0.02,
               ease: "easeOut",
             }}
-            className="bg-primary/15 dark:bg-primary/20 border-2 border-dashed border-primary/70 dark:border-primary/80 rounded-md flex flex-col items-center justify-center p-1.5 text-center shadow-xs select-none hover:bg-primary/25 dark:hover:bg-primary/30 transition-colors"
+            className={`border-2 border-dashed rounded-md flex flex-col items-center justify-center p-1.5 text-center shadow-xs select-none transition-colors ${
+              bloque.isFilteredMatch
+                ? "bg-purple-500/15 dark:bg-purple-500/25 border-purple-500 dark:border-purple-400 hover:bg-purple-500/25 dark:hover:bg-purple-500/35 ring-1 ring-purple-500/30"
+                : "bg-primary/15 dark:bg-primary/20 border-primary/70 dark:border-primary/80 hover:bg-primary/25 dark:hover:bg-primary/30"
+            }`}
             style={{
               gridColumn: bloque.diaIndex + 2,
               gridRow: `${bloque.horaInicioIndex + 1} / span ${bloque.duracion}`,
               zIndex: 15,
               pointerEvents: "auto",
-              cursor: "copy",
+              cursor: isDragging ? "copy" : "pointer",
+            }}
+            onClick={(e) => {
+              if (!isDragging && hoveredMateria && bloque.grupos && bloque.grupos.length > 0) {
+                e.stopPropagation();
+                if (bloque.grupos.length === 1) {
+                  const targetGroupNum = bloque.grupos[0];
+                  selectGrupo(hoveredMateria.codigo, targetGroupNum);
+                  if (!materiasSeleccionadas?.[hoveredMateria.codigo]) {
+                    toggleMateriaSelected(hoveredMateria.codigo);
+                  }
+                  clearHoveredMateria();
+                } else {
+                  const targetGroups = (hoveredMateria.grupos || []).filter((g) =>
+                    bloque.grupos.includes(g.numero),
+                  );
+                  useMateriasStore.setState({
+                    draggingMateria: hoveredMateria,
+                    lastDropSuccessful: true,
+                  });
+                  setShowGrupoSelector(true, targetGroups);
+                  clearHoveredMateria();
+                }
+              }
             }}
             onDrop={(e) => handleDrop(e, bloque)}
             onDragOver={(e) => {
@@ -153,14 +199,30 @@ function ScheduleDropOverlayComponent({
             }}
           >
             <div className="flex items-center gap-1">
-              <span className="font-semibold text-xs text-primary dark:text-primary-foreground font-mono">
+              <span
+                className={`font-semibold text-xs font-mono ${
+                  bloque.isFilteredMatch
+                    ? "text-purple-700 dark:text-purple-300 font-bold"
+                    : "text-primary dark:text-primary-foreground"
+                }`}
+              >
                 {bloque.grupos.length > 1
                   ? `${bloque.grupos.length} grupos`
                   : `Grupo ${bloque.grupos[0]}`}
               </span>
             </div>
-            <span className="text-[10px] text-zinc-600 dark:text-zinc-400 font-medium">
-              Soltar para colocar
+            <span
+              className={`text-[10px] font-medium ${
+                bloque.isFilteredMatch
+                  ? "text-purple-600/90 dark:text-purple-300/90 font-semibold"
+                  : "text-zinc-600 dark:text-zinc-400"
+              }`}
+            >
+              {isDragging
+                ? "Soltar para colocar"
+                : bloque.isFilteredMatch
+                  ? "Cumple filtro (Clic para colocar)"
+                  : "Disponible (Clic para colocar)"}
             </span>
           </motion.div>
         ))}

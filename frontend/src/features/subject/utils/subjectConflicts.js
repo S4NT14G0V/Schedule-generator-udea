@@ -33,16 +33,23 @@ export function checkGroupConflict(
 }
 
 /**
- * Verifica si un grupo cumple con los filtros avanzados aplicados
- * (días, franja horaria o jornada).
+ * Comprueba si existen filtros avanzados activos.
  */
-export function checkGrupoMatchesFilter(grupo, activeFilters = {}) {
-  const hasActiveAdvancedFilters = Boolean(
+export function hasActiveFilters(activeFilters = {}) {
+  return Boolean(
     (activeFilters.selectedDias && activeFilters.selectedDias.length > 0) ||
     (activeFilters.horaMinimaFilter && activeFilters.horaMinimaFilter > 6) ||
     (activeFilters.horaMaximaFilter && activeFilters.horaMaximaFilter < 22) ||
     activeFilters.selectedJornada,
   );
+}
+
+/**
+ * Verifica si un grupo cumple con los filtros avanzados aplicados
+ * (días, franja horaria o jornada).
+ */
+export function checkGrupoMatchesFilter(grupo, activeFilters = {}) {
+  const hasActiveAdvancedFilters = hasActiveFilters(activeFilters);
 
   if (!hasActiveAdvancedFilters || !grupo?.horarios) return true;
 

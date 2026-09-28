@@ -7,12 +7,16 @@ function SubjectCardComponent({
   isAutomaticDisabled,
   isHighlighted,
   isCardActive,
+  onMouseEnter,
+  onMouseLeave,
   children,
 }) {
   return (
     <motion.div
       id={`subject-card-${materiaCodigo}`}
       animate={shakeControls}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       className={`rounded-md border select-none duration-200 ${
         isAutomaticDisabled
           ? "opacity-40 bg-zinc-50/50 dark:bg-zinc-900/30 border-zinc-200 dark:border-zinc-800 cursor-not-allowed"

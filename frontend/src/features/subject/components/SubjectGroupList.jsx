@@ -13,6 +13,7 @@ function SubjectGroupListComponent({
   activeFilters = {},
   grupoRefs,
   onGrupoSelect,
+  onGroupHover,
   showGroupParticles,
   occupiedScheduleCells,
   occupiedManualCells,
@@ -94,6 +95,8 @@ function SubjectGroupListComponent({
                   }
                 }}
                 onSelect={() => onGrupoSelect(grupo.numero, tieneConflicto)}
+                onMouseEnter={() => onGroupHover?.(grupo.numero)}
+                onMouseLeave={() => onGroupHover?.(null)}
                 showParticles={showGroupParticles === grupo.numero}
               />
             );

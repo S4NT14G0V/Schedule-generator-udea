@@ -36,6 +36,8 @@ function PreferencesPopoverComponent({
     allowManualBlocksBySchedule,
     setAllowManualBlocksForSchedule,
     updateManualBlock,
+    hoverPreviewEnabled,
+    setHoverPreviewEnabled,
   } = useMateriasStore();
 
   const hasBlocksThisSchedule = useMemo(() => {
@@ -205,6 +207,28 @@ function PreferencesPopoverComponent({
                     checked={dragEnabled}
                     onChange={() => setDragEnabled(!dragEnabled)}
                     label="Permitir arrastrar materias al horario"
+                  />
+                </div>
+              )}
+
+              {/* Previsualizar al pasar el cursor (Hover Preview) */}
+              {!isMobile && (
+                <div
+                  className="flex items-center justify-between gap-3 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer select-none"
+                  onClick={() => setHoverPreviewEnabled(!hoverPreviewEnabled)}
+                >
+                  <div className="flex flex-col text-left">
+                    <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                      Previsualizar al pasar el cursor (Hover)
+                    </span>
+                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                      Muestra los espacios disponibles en el horario
+                    </span>
+                  </div>
+                  <Switch
+                    checked={hoverPreviewEnabled}
+                    onChange={() => setHoverPreviewEnabled(!hoverPreviewEnabled)}
+                    label="Previsualizar materias en el horario al hacer hover"
                   />
                 </div>
               )}

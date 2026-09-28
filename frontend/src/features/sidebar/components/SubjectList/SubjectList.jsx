@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useCallback, memo } from "react";
+import { useState, useRef, useMemo, useCallback, useEffect, memo } from "react";
 import { useMateriasStore } from "@/store/materias.store.js";
 import { GENERATION_MODES } from "@/features/sidebar/constants/sidebar.js";
 import {
@@ -55,6 +55,7 @@ function SubjectListComponent({
   const manualBlocks = useMateriasStore((s) => s.manualBlocks || []);
   const materiasSeleccionadas = useMateriasStore((s) => s.materiasSeleccionadas || {});
   const gruposSeleccionados = useMateriasStore((s) => s.gruposSeleccionados || {});
+  const setActiveFilters = useMateriasStore((s) => s.setActiveFilters);
 
   const hasExpandedSubjects = useMateriasStore(
     (s) => Object.keys(s.expandedSubjects || {}).length > 0,
@@ -101,6 +102,10 @@ function SubjectListComponent({
     }),
     [selectedDias, horaMinimaFilter, horaMaximaFilter, selectedJornada],
   );
+
+  useEffect(() => {
+    setActiveFilters?.(activeFilters);
+  }, [activeFilters, setActiveFilters]);
 
   // Filtrado compuesto
   const finalFilteredMaterias = useMemo(() => {

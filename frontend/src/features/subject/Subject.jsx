@@ -46,6 +46,10 @@ function SubjectComponent({
     (s) => s.toggleMateriaSelected,
   );
   const selectGrupo = useMateriasStore((s) => s.selectGrupo);
+  const draggingMateria = useMateriasStore((s) => s.draggingMateria);
+  const hoverPreviewEnabled = useMateriasStore((s) => s.hoverPreviewEnabled);
+  const setHoveredMateria = useMateriasStore((s) => s.setHoveredMateria);
+  const clearHoveredMateria = useMateriasStore((s) => s.clearHoveredMateria);
 
   const [showSelectParticles, setShowSelectParticles] = useState(false);
   const [showGroupParticles, setShowGroupParticles] = useState(null);
@@ -140,6 +144,28 @@ function SubjectComponent({
     (isManualMode && grupoSeleccionado) || (!isManualMode && isSelected);
   const isAutomaticDisabled = !isManualMode && hasZeroCuposGlobally;
 
+  const handleMouseEnter = useCallback(() => {
+    if (!hoverPreviewEnabled || draggingMateria) return;
+    setHoveredMateria(materia);
+  }, [hoverPreviewEnabled, draggingMateria, materia, setHoveredMateria]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (!hoverPreviewEnabled || draggingMateria) return;
+    clearHoveredMateria();
+  }, [hoverPreviewEnabled, draggingMateria, clearHoveredMateria]);
+
+  const handleGroupHover = useCallback(
+    (numeroGrupo) => {
+      if (!hoverPreviewEnabled || draggingMateria) return;
+      if (numeroGrupo) {
+        setHoveredMateria(materia, numeroGrupo);
+      } else {
+        setHoveredMateria(materia, null);
+      }
+    },
+    [hoverPreviewEnabled, draggingMateria, materia, setHoveredMateria],
+  );
+
   return (
     <SubjectCard
       materiaCodigo={materiaCodigo}
@@ -147,6 +173,8 @@ function SubjectComponent({
       isAutomaticDisabled={isAutomaticDisabled}
       isHighlighted={isHighlighted}
       isCardActive={isCardActive}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <SubjectHeader
         materia={materia}
@@ -174,6 +202,7 @@ function SubjectComponent({
         activeFilters={activeFilters}
         grupoRefs={grupoRefs}
         onGrupoSelect={handleGrupoSelectCallback}
+        onGroupHover={handleGroupHover}
         showGroupParticles={showGroupParticles}
         occupiedScheduleCells={occupiedScheduleCells}
         occupiedManualCells={occupiedManualCells}

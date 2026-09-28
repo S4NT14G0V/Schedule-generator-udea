@@ -15,12 +15,16 @@ function SubjectGroupItemComponent({
   activeFilters = {},
   grupoRef,
   onSelect,
+  onMouseEnter,
+  onMouseLeave,
   showParticles,
 }) {
   return (
     <div
       ref={grupoRef}
       onClick={disabled ? undefined : onSelect}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       className={`relative p-2 rounded-md border text-xs duration-200 flex items-center justify-between gap-2.5 transition-all ${
         isFocusedGrupo
           ? "ring-2 ring-primary ring-offset-1 dark:ring-offset-zinc-900 border-primary bg-primary/20 text-primary dark:text-blue-100 font-bold shadow-md scale-[1.02]"

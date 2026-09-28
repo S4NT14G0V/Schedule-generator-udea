@@ -20,6 +20,10 @@ import {
   SCHEDULE_MESSAGES,
 } from "@/features/schedule/constants/schedule.js";
 import { groupHasConflict, validateDropTarget } from "@/features/schedule/utils/scheduleConflicts.js";
+import {
+  hasActiveFilters,
+  checkGrupoMatchesFilter,
+} from "@/features/subject/utils/subjectConflicts.js";
 
 export default function Schedule() {
   const {
@@ -29,7 +33,10 @@ export default function Schedule() {
     gruposSeleccionados = {},
     materiasSeleccionadas = {},
     draggingMateria,
-    availableHorarios = [],
+    hoverPreviewEnabled,
+    activeFilters = {},
+    hoveredMateria,
+    hoveredGrupo,
     setAvailableHorarios,
     selectGrupo,
     toggleMateriaSelected,
@@ -206,30 +213,48 @@ export default function Schedule() {
     return tooltipState;
   }, [tooltipState, draggingMateria, horarioActualIndex]);
 
-  useEffect(() => {
-    if (draggingMateria) {
-      const grupoActual =
-        gruposSeleccionados[draggingMateria.codigo] ||
-        gruposSeleccionados[String(draggingMateria.codigo)];
+  const calculatedAvailableHorarios = useMemo(() => {
+    const targetMateria = draggingMateria || (hoverPreviewEnabled ? hoveredMateria : null);
+    if (!targetMateria) return [];
 
-      const todosLosHorarios = [];
-      (draggingMateria.grupos || []).forEach((grupo) => {
-        if (grupoActual && String(grupo.numero) === String(grupoActual)) return;
-        if (typeof grupo.cupoDisponible === "number" && grupo.cupoDisponible <= 0) return;
-        if (groupHasConflict(grupo, draggingMateria.codigo, celdasMateria)) return;
+    const grupoActual =
+      gruposSeleccionados[targetMateria.codigo] ||
+      gruposSeleccionados[String(targetMateria.codigo)];
 
-        (grupo.horarios || []).forEach((horario) => {
-          todosLosHorarios.push({
-            ...horario,
-            numeroGrupo: grupo.numero,
-          });
+    const hasFilters = hasActiveFilters(activeFilters);
+    const todosLosHorarios = [];
+
+    (targetMateria.grupos || []).forEach((grupo) => {
+      if (hoveredGrupo && String(grupo.numero) !== String(hoveredGrupo)) return;
+      if (grupoActual && String(grupo.numero) === String(grupoActual)) return;
+      if (typeof grupo.cupoDisponible === "number" && grupo.cupoDisponible <= 0) return;
+      if (groupHasConflict(grupo, targetMateria.codigo, celdasMateria)) return;
+
+      const isFilteredMatch =
+        hasFilters && checkGrupoMatchesFilter(grupo, activeFilters);
+
+      (grupo.horarios || []).forEach((horario) => {
+        todosLosHorarios.push({
+          ...horario,
+          numeroGrupo: grupo.numero,
+          isFilteredMatch,
         });
       });
-      setAvailableHorarios(todosLosHorarios);
-    } else {
-      setAvailableHorarios([]);
-    }
-  }, [draggingMateria, celdasMateria, gruposSeleccionados, setAvailableHorarios]);
+    });
+    return todosLosHorarios;
+  }, [
+    draggingMateria,
+    hoverPreviewEnabled,
+    hoveredMateria,
+    hoveredGrupo,
+    celdasMateria,
+    gruposSeleccionados,
+    activeFilters,
+  ]);
+
+  useEffect(() => {
+    setAvailableHorarios(calculatedAvailableHorarios);
+  }, [calculatedAvailableHorarios, setAvailableHorarios]);
 
   const handleDragEnter = useCallback((e) => {
     e.preventDefault();
@@ -322,7 +347,8 @@ export default function Schedule() {
             previewRef={previewRef}
             clasesParaRenderizar={clasesParaRenderizar}
             draggingMateria={draggingMateria}
-            availableHorarios={availableHorarios}
+            hoveredMateria={hoverPreviewEnabled ? hoveredMateria : null}
+            availableHorarios={calculatedAvailableHorarios}
             celdasMateria={celdasMateria}
             isClearingSequence={isClearingSequence}
             clearingExplosions={clearingExplosions}

@@ -58,9 +58,13 @@ export const createUiSlice = (set) => ({
   mobileTransition: null, // null | 'shrinking' | 'expanding'
   setMobileTransition: (t) => set({ mobileTransition: t }),
 
-  // Drag and Drop y selección de grupos en conflicto
+  // Drag and Drop, Hover Preview y selección de grupos en conflicto
   dragEnabled: false,
+  hoverPreviewEnabled: false,
+  activeFilters: {},
   draggingMateria: null,
+  hoveredMateria: null,
+  hoveredGrupo: null,
   hoveredScheduleCell: null,
   availableHorarios: [],
   showGrupoSelector: false,
@@ -69,13 +73,32 @@ export const createUiSlice = (set) => ({
   pendingModal: false,
   lastDropSuccessful: false,
 
+  setActiveFilters: (filters) => set({ activeFilters: filters || {} }),
   setDragEnabled: (value) => set({ dragEnabled: !!value }),
+  setHoverPreviewEnabled: (value) =>
+    set({
+      hoverPreviewEnabled: !!value,
+      hoveredMateria: null,
+      hoveredGrupo: null,
+    }),
 
   setDraggingMateria: (materia) =>
     set({
       draggingMateria: materia,
       availableHorarios: [],
       lastDropSuccessful: false,
+    }),
+
+  setHoveredMateria: (materia, grupo = null) =>
+    set({
+      hoveredMateria: materia,
+      hoveredGrupo: grupo,
+    }),
+
+  clearHoveredMateria: () =>
+    set({
+      hoveredMateria: null,
+      hoveredGrupo: null,
     }),
 
   setHoveredScheduleCell: (cell) =>
@@ -110,6 +133,8 @@ export const createUiSlice = (set) => ({
       }
       return {
         draggingMateria: null,
+        hoveredMateria: null,
+        hoveredGrupo: null,
         hoveredScheduleCell: null,
         availableHorarios: [],
         previewGrupo: null,

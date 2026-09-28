@@ -14,6 +14,7 @@ function ScheduleGridComponent({
   previewRef,
   clasesParaRenderizar = [],
   draggingMateria,
+  hoveredMateria,
   availableHorarios = [],
   celdasMateria,
   isClearingSequence,
@@ -182,8 +183,8 @@ function ScheduleGridComponent({
             })}
           </AnimatePresence>
 
-          {/* Overlay de horarios disponibles durante drag */}
-          {draggingMateria && (
+          {/* Overlay de horarios disponibles durante drag o hover */}
+          {(draggingMateria || hoveredMateria) && (
             <ScheduleDropOverlay
               availableHorarios={availableHorarios}
               dias={DIAS}
