@@ -1,87 +1,135 @@
-import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { useMateriasStore } from '../store/materiasStore.js';
+import { useState, useEffect, useRef, memo } from "react";
+import { motion } from "framer-motion";
+import toast from "react-hot-toast";
+import { useMateriasStore } from "../store/materiasStore.js";
+import { TrashIcon, GripIcon } from "../icons/index.js";
+import Tooltip from "./Tooltip.jsx";
 
-/**
- * Componente que representa una clase/materia dentro de una celda del grid
- * Se expande verticalmente según la duración de la clase
- */
-export default function ClassBlock({ clase, onHover, onLeave, onDelete, onRename, autoEdit, onEditComplete }) {
-  const { materia, grupo, horaInicio, horaFin, aula, profesor, color, duracion, isPreview, codigoMateria, source, manualId, pulsing } = clase;
-  const blockRef = React.useRef(null);
-  const inputRef = React.useRef(null);
-  const { materias, gruposSeleccionados, selectGrupo, toggleMateriaSelected } = useMateriasStore();
+const EXPLOSION_PARTICLES = Array.from({ length: 24 }).map((_, i) => {
+  const angle = (i / 24) * 360 + ((i % 5) * 8 - 16);
+  const rad = (angle * Math.PI) / 180;
+  const distance = 50 + ((i * 17) % 45); // Mayor dispersión (25px a 70px)
+  const isShard = i % 3 === 0; // Esquirlas cuadradas
+  const isSpark = i % 4 === 0; // Destellos brillantes
 
-  const [isEditing, setIsEditing] = React.useState(false);
-  const [editText, setEditText] = React.useState(materia || '');
-  const [displayName, setDisplayName] = React.useState(materia || '');
+  return {
+    id: i,
+    x: Math.cos(rad) * distance,
+    y: Math.sin(rad) * distance + (isShard ? 12 : 0), // Simula caída por gravedad en esquirlas
+    size: isShard ? 4 + (i % 3) * 3 : 3 + (i % 4) * 2,
+    rotateX: (i % 2 === 0 ? 1 : -1) * (180 + i * 45),
+    rotateZ: (i % 2 === 0 ? 1 : -1) * (90 + i * 30),
+    duration: 0.38 + (i % 4) * 0.04,
+    delay: (i % 5) * 0.008,
+    type: isSpark ? "spark" : "shard",
+  };
+});
 
-  React.useEffect(() => {
-    setEditText(materia || '');
-    setDisplayName(materia || '');
+const ENTRANCE_PARTICLES = Array.from({ length: 14 }).map((_, i) => {
+  const angle = (i / 14) * 360 + ((i % 3) * 10 - 10);
+  const rad = (angle * Math.PI) / 180;
+  const distance = 75 + ((i * 11) % 36);
+  return {
+    id: i,
+    x: Math.cos(rad) * distance,
+    y: Math.sin(rad) * distance,
+    size: 3 + (i % 3) * 1.8,
+    duration: 0.42 + (i % 3) * 0.05,
+    delay: (i % 4) * 0.015,
+  };
+});
+
+function ClassBlockComponent({
+  clase,
+  onHover,
+  onLeave,
+  onDelete,
+  onRename,
+  autoEdit,
+  onEditComplete,
+  isForceExploding = false,
+  onInitDrag,
+  onPointerDown: onPointerDownProp,
+}) {
+  const {
+    materia,
+    grupo,
+    aula,
+    color,
+    isPreview,
+    codigoMateria,
+    source,
+    manualId,
+    pulsing,
+  } = clase;
+
+  const blockRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(materia || "");
+  const [displayName, setDisplayName] = useState(materia || "");
+  const [isExploding, setIsExploding] = useState(false);
+  const [isShaking, setIsShaking] = useState(false);
+  const [showEntranceParticles, setShowEntranceParticles] =
+    useState(!isPreview);
+
+  const shakeMateriaCodigo = useMateriasStore((s) => s.shakeMateriaCodigo);
+  const shakeTimestamp = useMateriasStore((s) => s.shakeTimestamp);
+  const lastShakeTimestampRef = useRef(shakeTimestamp || 0);
+
+  useEffect(() => {
+    if (
+      shakeTimestamp &&
+      shakeTimestamp !== lastShakeTimestampRef.current &&
+      shakeMateriaCodigo &&
+      (String(shakeMateriaCodigo) === String(codigoMateria) ||
+        (materia && String(shakeMateriaCodigo) === String(materia)))
+    ) {
+      lastShakeTimestampRef.current = shakeTimestamp;
+      setIsShaking(true);
+      const timer = setTimeout(() => setIsShaking(false), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [shakeMateriaCodigo, shakeTimestamp, codigoMateria, materia]);
+
+  useEffect(() => {
+    if (isForceExploding && !isExploding) {
+      onLeave?.();
+      setIsExploding(true);
+    }
+  }, [isForceExploding]);
+
+  useEffect(() => {
+    if (!isPreview) {
+      const timer = setTimeout(() => setShowEntranceParticles(false), 550);
+      return () => clearTimeout(timer);
+    }
+  }, [isPreview]);
+
+  useEffect(() => {
+    setEditText(materia || "");
+    setDisplayName(materia || "");
   }, [materia]);
 
-  // Solo considerar como 'manual' los bloques creados manualmente (tienen manualId)
-  const isManual = source === 'manual' && !!manualId;
+  const isManual = source === "manual" && Boolean(manualId);
 
-  // If parent requests autoEdit, enter edit mode and focus input (only for manual blocks)
-  React.useEffect(() => {
-    if (autoEdit && source === 'manual' && !!manualId) {
+  useEffect(() => {
+    return () => onLeave?.();
+  }, [onLeave]);
+
+  useEffect(() => {
+    if (autoEdit && isManual) {
       setIsEditing(true);
-      // focus on next tick when input renders
-      setTimeout(() => {
-        try { inputRef.current && inputRef.current.focus(); } catch (e) {}
-      }, 0);
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
-  }, [autoEdit, source, manualId]);
-  const isMobile = window.innerWidth <= 768;
+  }, [autoEdit, isManual]);
 
-  // Resolver código de materia si no viene en la clase
-  const codigo = useMemo(() => {
-    if (codigoMateria) return codigoMateria;
-    if (!materia || !materias) return undefined;
-    const normalize = (s = '') => s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
-    const found = materias.find(m => normalize(m.nombre) === normalize(String(materia)) || m.codigo === codigoMateria);
-    return found ? found.codigo : undefined;
-  }, [codigoMateria, materia, materias]);
-
-  // Calcular color de fondo del icono como una versión más oscura del color del bloque
-  const iconColors = useMemo(() => {
-    const fallback = { bg: 'rgba(255,255,255,0.9)', text: '#111827' };
-    if (!color) return fallback;
-    try {
-      const c = String(color).trim();
-      const hexMatch = c.match(/^#([a-fA-F0-9]{3}|[a-fA-F0-9]{6})$/);
-      if (hexMatch) {
-        let hex = hexMatch[1];
-        if (hex.length === 3) {
-          hex = hex.split('').map(x => x + x).join('');
-        }
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-        const darken = (amt) => {
-          const dr = Math.max(0, Math.round(r * (1 - amt)));
-          const dg = Math.max(0, Math.round(g * (1 - amt)));
-          const db = Math.max(0, Math.round(b * (1 - amt)));
-          return `rgb(${dr}, ${dg}, ${db})`;
-        };
-        const bg = darken(0.1); // 10% darker
-        const luminance = (0.1126 * r + 0.1152 * g + 0.0722 * b) / 255;
-        const text = luminance < 0.3 ? '#ffffff' : '#111827';
-        return { bg, text };
-      }
-      // Fallback: use provided color but lower opacity
-      return { bg: `${c}`, text: '#ffffff' };
-    } catch (err) {
-      return fallback;
-    }
-  }, [color]);
+  const isMobile =
+    typeof window !== "undefined" ? window.innerWidth <= 768 : false;
 
   const handleMouseEnter = () => {
-    // No activar tooltip en móvil
-    if (isMobile) return;
-    
+    if (isMobile || isExploding) return;
     if (blockRef.current && onHover) {
       const rect = blockRef.current.getBoundingClientRect();
       onHover(clase, {
@@ -93,197 +141,522 @@ export default function ClassBlock({ clase, onHover, onLeave, onDelete, onRename
     }
   };
 
-  // Validar conflicto de horarios antes de seleccionar grupo
   const handleGrupoSelect = () => {
-    // Si el grupo ya está seleccionado, deseleccionar
+    const { gruposSeleccionados, selectGrupo, toggleMateriaSelected } =
+      useMateriasStore.getState();
     const grupoSeleccionado = gruposSeleccionados[codigoMateria];
-
     if (grupoSeleccionado === grupo) {
       selectGrupo(codigoMateria, null);
       toggleMateriaSelected(codigoMateria);
-      return;
     }
   };
 
-  // Handlers for manual block actions
   const handleDelete = (e) => {
     e.stopPropagation();
     e.preventDefault();
+    onLeave?.();
 
-    // If this block corresponds to a materia (has codigoMateria), treat delete as deselecting the group
     if (codigoMateria) {
       handleGrupoSelect();
       return;
     }
 
-    // Otherwise (manual block), call parent-provided delete callback if available
+    if (onDelete) {
+      if (isManual) {
+        setIsExploding(true);
+        setTimeout(() => onDelete(), 420);
+        return;
+      }
+      onDelete();
+      return;
+    }
+
+    handleGrupoSelect();
+  };
+
+  const handleRemoveSubject = (e) => {
+    e?.stopPropagation();
+    onLeave?.();
+
     if (onDelete) {
       onDelete();
       return;
     }
 
-    // Fallback: if we somehow have manualId and onDelete expects id, try that
-    if (manualId && onDelete) {
-      onDelete(manualId);
-      return;
-    }
-
-    // Last resort, deselect group behavior
-    handleGrupoSelect();
+    setIsExploding(true);
+    setTimeout(() => {
+      if (manualId) {
+        const state = useMateriasStore.getState();
+        state.removeManualBlock?.(manualId);
+      } else if (codigoMateria) {
+        const state = useMateriasStore.getState();
+        state.deleteMateriaFromSchedule?.(codigoMateria);
+      }
+    }, 240);
   };
 
   const commitEdit = () => {
     const newName = editText?.trim();
-    const finalName = newName && newName.length > 0 ? newName : 'Bloque manual';
-    if (onRename) {
-      // call parent-provided bound callback with finalName
-      try { onRename(finalName); } catch (err) {}
-    }
-    // update local display immediately and close editor (optimistic)
+    const finalName = newName && newName.length > 0 ? newName : "Bloque manual";
+    if (onRename) onRename(finalName);
     setEditText(finalName);
     setDisplayName(finalName);
     setIsEditing(false);
-
-    // notify parent that edit completed (useful to trigger confetti)
-    try { if (onEditComplete) onEditComplete(finalName); } catch (err) {}
+    if (onEditComplete) onEditComplete(finalName);
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      commitEdit();
-    } else if (e.key === 'Escape') {
+    if (e.key === "Enter") commitEdit();
+    else if (e.key === "Escape") {
       setIsEditing(false);
-      setEditText(materia || '');
+      setEditText(materia || "");
     }
   };
 
+  const handleBlockClick = (e) => {
+    if (e.target.closest("button") || e.target.closest("input")) return;
+    onLeave?.();
+    if (codigoMateria) {
+      const { focusMateria } = useMateriasStore.getState();
+      if (focusMateria) focusMateria(codigoMateria, grupo);
+    }
+  };
+
+  const dragEnabled = useMateriasStore((s) => s.dragEnabled);
+
+  const isDraggable =
+    Boolean(codigoMateria || materia) &&
+    !isEditing &&
+    !isExploding &&
+    !isPreview &&
+    !manualId &&
+    dragEnabled;
+
+  const checkGroupConflict = (grupoToTest, activeCodigo) => {
+    const state = useMateriasStore.getState();
+    const { materias: todasMaterias, gruposSeleccionados } = state;
+    const diasArr = [
+      "Lunes",
+      "Martes",
+      "Miércoles",
+      "Jueves",
+      "Viernes",
+      "Sábado",
+      "Domingo",
+    ];
+    const horasArr = Array.from({ length: 16 }, (_, i) => i + 6);
+
+    const celdasOtras = new Set();
+    Object.entries(gruposSeleccionados || {}).forEach(([cod, gNum]) => {
+      if (!gNum || String(cod) === String(activeCodigo)) return;
+      const mat = (todasMaterias || []).find(
+        (m) => String(m.codigo) === String(cod),
+      );
+      const grp = mat?.grupos?.find((g) => String(g.numero) === String(gNum));
+      (grp?.horarios || []).forEach((h) => {
+        (h.dias || []).forEach((d) => {
+          const dIdx = diasArr.indexOf(d);
+          if (dIdx !== -1) {
+            const hIdx = horasArr.indexOf(h.horaInicio);
+            const dur = h.horaFin - h.horaInicio;
+            for (let i = 0; i < dur; i++) {
+              celdasOtras.add(`${dIdx}-${hIdx + i}`);
+            }
+          }
+        });
+      });
+    });
+
+    return (grupoToTest.horarios || []).some((h) => {
+      return (h.dias || []).some((d) => {
+        const dIdx = diasArr.indexOf(d);
+        if (dIdx === -1) return false;
+        const hIdx = horasArr.indexOf(h.horaInicio);
+        const dur = h.horaFin - h.horaInicio;
+        for (let i = 0; i < dur; i++) {
+          if (celdasOtras.has(`${dIdx}-${hIdx + i}`)) return true;
+        }
+        return false;
+      });
+    });
+  };
+
+  const handleDragStart = (e) => {
+    if (!isDraggable) {
+      e.preventDefault();
+      return;
+    }
+
+    const state = useMateriasStore.getState();
+    const mat =
+      state.materias?.find((m) => String(m.codigo) === String(codigoMateria)) ||
+      state.materias?.find((m) => m.nombre === materia);
+
+    if (!mat || !mat.grupos || mat.grupos.length === 0) {
+      e.preventDefault();
+      return;
+    }
+
+    // Verificar si existen grupos disponibles válidos (distintos al actual, con cupo y sin conflicto)
+    const grupoActual =
+      grupo !== null && typeof grupo !== "undefined"
+        ? grupo
+        : state.gruposSeleccionados[mat.codigo];
+
+    const availableGroups = (mat.grupos || []).filter((g) => {
+      if (
+        grupoActual !== null &&
+        typeof grupoActual !== "undefined" &&
+        String(g.numero) === String(grupoActual)
+      ) {
+        return false;
+      }
+      if (typeof g.cupoDisponible === "number" && g.cupoDisponible <= 0) {
+        return false;
+      }
+      return !checkGroupConflict(g, mat.codigo);
+    });
+
+    if (availableGroups.length === 0) {
+      e.preventDefault();
+      setIsShaking(true);
+      setTimeout(() => setIsShaking(false), 500);
+      toast.error("No hay otros horarios disponibles para esta materia");
+      return;
+    }
+
+    onLeave?.();
+
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(mat.codigo));
+
+    // Crear un drag preview sólido, nítido y 100% opaco idéntico al del sidebar
+    if (typeof document !== "undefined") {
+      const isDark = document.documentElement.classList.contains("dark");
+      const dragNode = document.createElement("div");
+      dragNode.style.position = "fixed";
+      dragNode.style.top = "-9999px";
+      dragNode.style.left = "-9999px";
+      dragNode.style.zIndex = "999999";
+      dragNode.style.opacity = "1";
+      dragNode.style.pointerEvents = "none";
+      dragNode.style.background = isDark ? "#18181b" : "#ffffff";
+      dragNode.style.color = isDark ? "#f4f4f5" : "#09090b";
+      dragNode.style.border = isDark
+        ? "1.5px solid #3f3f46"
+        : "1.5px solid #cbd5e1";
+      dragNode.style.borderRadius = "8px";
+      dragNode.style.padding = "7px 12px";
+      dragNode.style.boxShadow =
+        "0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.2)";
+      dragNode.style.display = "flex";
+      dragNode.style.alignItems = "center";
+      dragNode.style.gap = "8px";
+      dragNode.style.fontFamily = "ui-sans-serif, system-ui, sans-serif";
+      dragNode.style.fontSize = "12px";
+      dragNode.style.fontWeight = "600";
+      dragNode.style.whiteSpace = "nowrap";
+
+      dragNode.innerHTML = `
+        <span style="
+          background: #1392ec;
+          color: #ffffff;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-family: ui-monospace, monospace;
+          font-size: 10px;
+          font-weight: 700;
+        ">#${mat.codigo || ""}</span>
+        <span>${mat.nombre}</span>
+      `;
+
+      document.body.appendChild(dragNode);
+      e.dataTransfer.setDragImage(dragNode, 24, 18);
+      setTimeout(() => {
+        if (document.body.contains(dragNode)) {
+          document.body.removeChild(dragNode);
+        }
+      }, 0);
+    }
+
+    // Actualizar el estado en el siguiente tick para que dragstart se complete en <1ms
+    setTimeout(() => {
+      state.setDraggingMateria({
+        codigo: mat.codigo,
+        nombre: mat.nombre,
+        grupos: mat.grupos,
+      });
+    }, 0);
+  };
+
+  const handleDragEnd = () => {
+    const state = useMateriasStore.getState();
+    if (!state.lastDropSuccessful && state.draggingMateria?.codigo) {
+      state.triggerShakeMateria?.(state.draggingMateria.codigo);
+    }
+    state.clearDragState?.();
+  };
+
+  const blockColor = color || "#3b82f6";
 
   return (
-    <motion.div
-      ref={blockRef}
-      // Slide enter/exit so permanent blocks animate visibly
-      initial={{ x: '-80%', opacity: 0, scale: isPreview ? 0.95 : 0.98 }}
-      animate={{ x: 0, opacity: isPreview ? 0.75 : 1, scale: 1 }}
-      exit={{ x: '1000%', opacity: 0, scale: 0.95 }}
-      transition={{
-        type: 'spring',
-        stiffness: 220,
-        damping: 20,
-      }}
-      whileHover={{
-        scale: 1.02,
-        y: -2,
-        transition: { duration: 0.15 }
-      }}
-      className={`absolute select-none inset-1 rounded-lg border-2 border-l-[6px] flex flex-col justify-center p-2.5 overflow-hidden hover:shadow-lg hover:z-20 cursor-pointer group ${isPreview ? 'border-dashed' : ''} ${pulsing ? 'pulse-animate' : ''}`}
+    <div
       data-no-select
-      style={{
-        backgroundColor: color ? `${color}15` : '#3b82f615',
-        borderColor: color || '#3b82f6',
-        boxShadow: `0 2px 8px ${color ? `${color}30` : '#3b82f630'}, 0 1px 3px ${color ? `${color}20` : '#3b82f620'}`,
-      }}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={onLeave}
+      data-class-block="true"
+      draggable={isDraggable}
+      onDragStart={isDraggable ? handleDragStart : undefined}
+      onDragEnd={isDraggable ? handleDragEnd : undefined}
+      onClick={handleBlockClick}
+      className={`absolute inset-1 rounded-md pointer-events-auto select-none ${
+        isDraggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+      }`}
     >
-      <div className='absolute h-full right-0'>
-        {/* Botón de eliminar (solo para grupos manuales) - Arriba */}
-        {isManual && (
-          <button
-            onClick={handleDelete}
-            title="Eliminar del horario"
-            className="absolute -right-1 -top-0 cursor-pointer bg-red-600 w-7 h-7 rounded-sm flex items-center justify-center opacity-0 transition-opacity duration-150 ease-in-out group-hover:opacity-100 hover:opacity-100"
-            onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="size-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-            </svg>
-          </button>
-        )}
-        
-        {/* Botón Ver Cursum - Abajo */}
-        {codigo && (
-          <a
-            href={`https://ingenieria2.udea.edu.co/cursum/#/publico/materias/${codigo}/programa_curso`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            title="Ver en Cursum"
-            className="absolute -right-1 -bottom-1 px-2 py-2 rounded-sm flex items-center justify-center gap-1 text-[12px] font-semibold whitespace-nowrap opacity-0 md:opacity-0 max-md:opacity-100 pointer-events-none md:pointer-events-none max-md:pointer-events-auto transition-opacity duration-150 ease-in-out group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
-            style={{ backgroundColor: iconColors.bg, color: iconColors.text }}
-          >
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
-            </svg>
-            <span>Ver Cursum</span>
-          </a>
-        )}
-      </div>
-
-      <div className="flex-shrink-0">
-        {isPreview && (
-          <span className="text-[9px] font-bold text-white bg-black/40 px-1.5 py-0.5 rounded mb-1 inline-block">
-            PREVIEW
-          </span>
-        )}
-        {isEditing && isManual ? (
-          <input
-            ref={inputRef}
-            value={editText}
-            onChange={(e) => setEditText(e.target.value)}
-            onBlur={commitEdit}
-            onKeyDown={handleKeyDown}
-            className="w-full text-xs font-bold p-1 rounded border border-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-500 bg-white dark:bg-zinc-800"
-            style={{ color: (typeof document !== 'undefined' && document.documentElement.classList.contains('dark')) ? '#ffffff' : '#111827', caretColor: (typeof document !== 'undefined' && document.documentElement.classList.contains('dark')) ? '#ffffff' : '#111827' }}
-            onMouseDown={(e) => e.stopPropagation()}
-            aria-label="Editar nombre del bloque"
-          />
-        ) : (
-          <p
-            onDoubleClick={() => isManual && setIsEditing(true)}
-            className="font-bold text-xs leading-tight mb-0.5 line-clamp-2 cursor-text"
-            style={{ color: color || '#3b82f6' }}
-          >
-            {displayName}
-          </p>
-        )}
-        {grupo ? (
-          <p className="text-[10px] text-zinc-600 dark:text-zinc-400 font-medium">
-            Grupo {grupo}
-          </p>
-        ) : null}
-      </div>
-
-      <div className="space-y-0.5 mt-2 flex-shrink-0">
-        {aula && (
-          <div className="flex items-center gap-1">
-            <svg className="w-3 h-3 text-zinc-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span className="text-[10px] text-zinc-500 font-medium truncate">
+      {/* Contenedor principal con animación de destructuración física */}
+      <motion.div
+        ref={blockRef}
+        onClick={handleBlockClick}
+        initial={false}
+        animate={
+          isExploding
+            ? {
+                scale: [1, 1.18, 0],
+                opacity: [1, 1, 0],
+                rotate: [0, -6, 8, -4],
+                filter: [
+                  "brightness(1) drop-shadow(0 0 0px transparent)",
+                  "brightness(2.5) contrast(1.5) drop-shadow(0 0 12px rgba(255,255,255,0.9))",
+                  "brightness(4) blur(8px)",
+                ],
+              }
+            : isShaking
+              ? { x: [0, -9, 9, -7, 7, -4, 4, 0] }
+              : { x: 0 }
+        }
+        transition={
+          isExploding
+            ? { duration: 0.4, ease: [0.05, 0.7, 0.1, 1] }
+            : isShaking
+              ? { duration: 0.45, ease: "easeInOut" }
+              : { duration: 0.15 }
+        }
+        className={`relative w-full h-full rounded-md border border-l-[3.5px] flex items-center justify-center p-1 overflow-hidden hover:shadow-md select-none group transition-shadow duration-100 ease-out ${
+          isPreview ? "border-dashed ring-2 ring-primary/40 shadow-md" : ""
+        } ${pulsing ? "pulse-animate" : ""}`}
+        data-no-select
+        style={{
+          backgroundColor: isPreview ? `${blockColor}22` : `${blockColor}12`,
+          borderColor: blockColor,
+        }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={onLeave}
+      >
+        {/* Badges superiores en posición absolute (arriba a la izquierda) */}
+        <div className="absolute top-1 left-1.5 flex items-center gap-1 flex-wrap min-w-0 z-10 pointer-events-none">
+          {grupo !== null && typeof grupo !== "undefined" && (
+            <span
+              className="font-mono text-xs font-bold px-1.5 py-0.5 rounded leading-none text-white shadow-2xs"
+              style={{ backgroundColor: blockColor }}
+            >
+              G{grupo}
+            </span>
+          )}
+          {aula && (
+            <span className="font-mono text-xs font-medium text-primary dark:text-zinc-100 bg-primary/5 border-primary/40 border px-1 py-0.5 rounded leading-none truncate max-w-[85px]">
               {aula}
             </span>
-          </div>
-        )}
-        <div className="flex items-center gap-1">
-          <svg className="w-3 h-3 text-zinc-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span className="text-[10px] text-zinc-500 font-medium">
-            {horaInicio}:00 - {horaFin}:00
-          </span>
-        </div>
-        {profesor && isMobile && (
-          <div className="flex items-center gap-1">
-            <svg className="w-3 h-3 text-zinc-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            <span className="text-[10px] text-zinc-500 font-medium truncate">
-              {profesor}
+          )}
+          {isPreview && (
+            <span className="font-mono text-[8.5px] font-bold text-white bg-primary px-1.5 py-0.5 rounded leading-none">
+              PREVIEW
             </span>
+          )}
+        </div>
+
+        {/* Acciones en hover en posición absolute */}
+        {!isPreview && !isExploding && (
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20">
+            {isDraggable && (
+              <Tooltip content="Arrastrar materia al horario" position="top">
+                <div
+                  className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center p-0.5 rounded text-zinc-400 dark:text-zinc-400 hover:text-primary dark:hover:text-primary cursor-grab"
+                  aria-label="Arrastrar materia al horario"
+                >
+                  <GripIcon className="w-3.5 h-3.5" />
+                </div>
+              </Tooltip>
+            )}
+            <Tooltip
+              content={
+                manualId
+                  ? "Eliminar bloque manual"
+                  : "Quitar materia del horario"
+              }
+              position="top"
+            >
+              <button
+                type="button"
+                onClick={handleRemoveSubject}
+                className="p-1 absolute top-1 right-1 rounded text-zinc-400 hover:text-red-500 hover:bg-red-500/10 active:scale-90 transition-all flex items-center justify-center cursor-pointer"
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                }}
+                aria-label={
+                  manualId ? "Eliminar bloque manual" : "Quitar del horario"
+                }
+              >
+                <TrashIcon className="w-3.5 h-3.5" />
+              </button>
+            </Tooltip>
           </div>
         )}
-      </div>
-    </motion.div>
+
+        {/* Nombre del Bloque en la mitad de todo */}
+        <div className="w-full h-full flex items-center justify-center text-center px-2 py-1 min-w-0 z-0">
+          {isEditing && isManual ? (
+            <input
+              ref={inputRef}
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onBlur={commitEdit}
+              onKeyDown={handleKeyDown}
+              className="w-full text-xs font-semibold p-1 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-primary text-center"
+              onMouseDown={(e) => e.stopPropagation()}
+              aria-label="Editar nombre del bloque"
+            />
+          ) : (
+            <p
+              onDoubleClick={() => isManual && setIsEditing(true)}
+              className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 leading-snug line-clamp-2 text-center select-none"
+            >
+              {displayName}
+            </p>
+          )}
+        </div>
+      </motion.div>
+
+      {/* 💥 EXPLOSIÓN MEJORADA */}
+      {isExploding && (
+        <div className="absolute inset-0 pointer-events-none z-50 flex items-center justify-center overflow-visible">
+          {/* Flash Blanco Inicial (Impacto) */}
+          <motion.div
+            initial={{ scale: 0.3, opacity: 1 }}
+            animate={{ scale: 2.2, opacity: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="absolute w-12 h-12 rounded-full bg-white shadow-[0_0_25px_#ffffff]"
+          />
+
+          {/* Shockwave Principal (Onda rápida) */}
+          <motion.div
+            initial={{ scale: 0.1, opacity: 1, borderWidth: "4px" }}
+            animate={{ scale: 3.2, opacity: 0, borderWidth: "0.5px" }}
+            transition={{ duration: 0.38, ease: [0.1, 0.8, 0.3, 1] }}
+            className="absolute w-14 h-14 rounded-full border"
+            style={{
+              borderColor: blockColor,
+              boxShadow: `0 0 15px ${blockColor}`,
+            }}
+          />
+
+          {/* Shockwave Secundaria (Onda expansiva suave) */}
+          <motion.div
+            initial={{ scale: 0.2, opacity: 0.8, borderWidth: "2px" }}
+            animate={{ scale: 2.4, opacity: 0, borderWidth: "0px" }}
+            transition={{ duration: 0.42, delay: 0.04, ease: "easeOut" }}
+            className="absolute w-14 h-14 rounded-full border border-white"
+          />
+
+          {/* Sistema de Partículas Avanzado */}
+          {EXPLOSION_PARTICLES.map((p) => {
+            const isSpark = p.type === "spark";
+            const isShard = p.type === "shard";
+
+            return (
+              <motion.div
+                key={p.id}
+                initial={{
+                  x: 0,
+                  y: 0,
+                  scale: 0.2,
+                  opacity: 1,
+                  rotateX: 0,
+                  rotateZ: 0,
+                }}
+                animate={{
+                  x: p.x,
+                  y: p.y,
+                  scale: [0.4, 1.4, 0],
+                  opacity: [1, 1, 0],
+                  rotateX: p.rotateX,
+                  rotateZ: p.rotateZ,
+                }}
+                transition={{
+                  duration: p.duration,
+                  delay: p.delay,
+                  ease: [0.05, 0.85, 0.15, 1],
+                }}
+                className={`absolute pointer-events-none ${
+                  isShard ? "rounded-xs" : "rounded-full"
+                }`}
+                style={{
+                  width: p.size,
+                  height: p.size,
+                  backgroundColor: isSpark
+                    ? "#ffffff"
+                    : p.id % 3 === 0
+                      ? "#fbbf24"
+                      : blockColor,
+                  boxShadow: isSpark
+                    ? `0 0 10px #ffffff, 0 0 18px ${blockColor}`
+                    : `0 0 8px ${blockColor}`,
+                  clipPath: isSpark
+                    ? "polygon(50% 0%, 65% 35%, 100% 50%, 65% 65%, 50% 100%, 35% 65%, 0% 50%, 35% 35%)"
+                    : "none",
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Partículas de entrada */}
+      {showEntranceParticles && !isExploding && !isPreview && (
+        <div className="absolute inset-0 pointer-events-none z-30 flex items-center justify-center overflow-visible">
+          <motion.div
+            initial={{ scale: 0.2, opacity: 0.9, borderWidth: "2.5px" }}
+            animate={{ scale: 1.9, opacity: 0, borderWidth: "1px" }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+            className="absolute w-12 h-12 rounded-full border pointer-events-none"
+            style={{ borderColor: blockColor }}
+          />
+
+          {ENTRANCE_PARTICLES.map((p) => (
+            <motion.div
+              key={`enter-${p.id}`}
+              initial={{ x: 0, y: 0, scale: 0.4, opacity: 1 }}
+              animate={{
+                x: p.x,
+                y: p.y,
+                scale: [0.4, 1.25, 0],
+                opacity: [1, 1, 0],
+              }}
+              transition={{
+                duration: p.duration,
+                delay: p.delay,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              className="absolute rounded-full pointer-events-none"
+              style={{
+                width: p.size,
+                height: p.size,
+                backgroundColor: p.id % 2 === 0 ? "#ffffff" : blockColor,
+                boxShadow: `0 0 6px ${blockColor}`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
+
+export default memo(ClassBlockComponent);
