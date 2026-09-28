@@ -4,6 +4,14 @@ import { quantizeColor, adjustBrightnessContrast } from "../utils/dither.js";
 
 function DitherBackgroundComponent() {
   const canvasRef = useRef(null);
+  const mouseRef = useRef({
+    x: -999,
+    y: -999,
+    targetX: -999,
+    targetY: -999,
+    radius: 0,
+    targetRadius: 0,
+  });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -14,6 +22,42 @@ function DitherBackgroundComponent() {
     let ro;
     let lastTime = 0;
     const interval = 1000 / DITHER_CONFIG.TARGET_FPS;
+
+    const mouse = mouseRef.current;
+
+    const handlePointerMove = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const inside =
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom;
+
+      if (inside) {
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        mouse.targetX = x;
+        mouse.targetY = y;
+        mouse.targetRadius = 30; // Diámetro 160px (círculo más contenido y nítido)
+        if (mouse.radius < 1) {
+          mouse.x = x;
+          mouse.y = y;
+        }
+      } else {
+        mouse.targetRadius = 0;
+      }
+    };
+
+    const handlePointerLeave = () => {
+      mouse.targetRadius = 0;
+    };
+
+    window.addEventListener("pointermove", handlePointerMove, {
+      passive: true,
+    });
+    document.addEventListener("pointerleave", handlePointerLeave, {
+      passive: true,
+    });
 
     const img = new Image();
     img.src = DITHER_CONFIG.IMAGE_SRC;
@@ -39,12 +83,16 @@ function DitherBackgroundComponent() {
       const cw = canvas.offsetWidth || 500;
       const ch = canvas.offsetHeight || 900;
       const visibleImgW = (cw / ch) * imgH;
-      const rightX = Math.min(imgW - 16, Math.floor(imgW / 2 + visibleImgW / 2 - 18));
+      const rightX = Math.min(
+        imgW - 16,
+        Math.floor(imgW / 2 + visibleImgW / 2 - 18),
+      );
       const bottomY = imgH - 8;
 
       // Dibujar texto "UdeA" en cursiva integrado antes del dithering
       sCtx.save();
-      sCtx.font = "italic 700 56px 'Dancing Script', 'Caveat', 'Brush Script MT', 'Segoe Script', cursive";
+      sCtx.font =
+        "italic 700 56px 'Dancing Script', 'Caveat', 'Brush Script MT', 'Segoe Script', cursive";
       sCtx.textAlign = "right";
       sCtx.textBaseline = "bottom";
 
@@ -105,9 +153,21 @@ function DitherBackgroundComponent() {
           const a = (aSum / count) | 0;
 
           // Ajustar brillo y contraste
-          r = adjustBrightnessContrast(r, DITHER_CONFIG.BRIGHTNESS, DITHER_CONFIG.CONTRAST);
-          g = adjustBrightnessContrast(g, DITHER_CONFIG.BRIGHTNESS, DITHER_CONFIG.CONTRAST);
-          b = adjustBrightnessContrast(b, DITHER_CONFIG.BRIGHTNESS, DITHER_CONFIG.CONTRAST);
+          r = adjustBrightnessContrast(
+            r,
+            DITHER_CONFIG.BRIGHTNESS,
+            DITHER_CONFIG.CONTRAST,
+          );
+          g = adjustBrightnessContrast(
+            g,
+            DITHER_CONFIG.BRIGHTNESS,
+            DITHER_CONFIG.CONTRAST,
+          );
+          b = adjustBrightnessContrast(
+            b,
+            DITHER_CONFIG.BRIGHTNESS,
+            DITHER_CONFIG.CONTRAST,
+          );
 
           baseR[bIdx] = r;
           baseG[bIdx] = g;
@@ -150,6 +210,11 @@ function DitherBackgroundComponent() {
         lastTime = now;
 
         const timeSec = (now - startTime) / 1000.0;
+
+        // Física suave de interpolación del círculo hacia el cursor
+        mouse.x += (mouse.targetX - mouse.x) * 0.22;
+        mouse.y += (mouse.targetY - mouse.y) * 0.22;
+        mouse.radius += (mouse.targetRadius - mouse.radius) * 0.15;
 
         for (let i = 0; i < numBlocks; i++) {
           if (baseA[i] < 20) {
@@ -194,6 +259,38 @@ function DitherBackgroundComponent() {
         ctx.fillStyle = DITHER_CONFIG.BACKGROUND_COLOR;
         ctx.fillRect(0, 0, currentCw, currentCh);
         ctx.drawImage(offGrid, offsetX, offsetY, renderW, renderH);
+
+        // Revelar imagen normal original nítida dentro del círculo del mouse (sin dither)
+        if (mouse.radius > 0.5) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(mouse.x, mouse.y, mouse.radius, 0, Math.PI * 2);
+          ctx.clip();
+
+          // Dibujar la imagen normal en alta calidad (suavizado activado)
+          ctx.imageSmoothingEnabled = true;
+          ctx.drawImage(sampleCanvas, offsetX, offsetY, renderW, renderH);
+          ctx.restore();
+
+          // Aro estético sutil que delimita la zona normal
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(mouse.x, mouse.y, mouse.radius, 0, Math.PI * 2);
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+          ctx.shadowColor = "rgba(255, 255, 255, 0.25)";
+          ctx.shadowBlur = 12;
+          ctx.stroke();
+
+          // Anillo exterior tenue
+          ctx.beginPath();
+          ctx.arc(mouse.x, mouse.y, mouse.radius + 1.5, 0, Math.PI * 2);
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+          ctx.shadowBlur = 0;
+          ctx.stroke();
+          ctx.restore();
+        }
       };
 
       animId = requestAnimationFrame(draw);
@@ -204,6 +301,8 @@ function DitherBackgroundComponent() {
     return () => {
       cancelAnimationFrame(animId);
       if (ro) ro.disconnect();
+      window.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerleave", handlePointerLeave);
     };
   }, []);
 
@@ -216,6 +315,8 @@ function DitherBackgroundComponent() {
           imageRendering: "pixelated",
         }}
       />
+
+      {/* Sombra de viñeta general */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
