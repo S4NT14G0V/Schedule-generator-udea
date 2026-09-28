@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useMateriasStore } from "../store/materiasStore";
 
 /**
@@ -13,12 +13,8 @@ export default function ScheduleDropOverlay({
   onBlockDrop,
   showToastMessage,
   celdasMateria,
-  hoveredCell,
-  hoveredValidKeys,
-  hoveredValidGroupNumbers,
 }) {
-  const { setPreviewGrupo, draggingMateria, clearDragState } =
-    useMateriasStore();
+  const { draggingMateria, clearDragState } = useMateriasStore();
 
   if (!availableHorarios || availableHorarios.length === 0) {
     return null;

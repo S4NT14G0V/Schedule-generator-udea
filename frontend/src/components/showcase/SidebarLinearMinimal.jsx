@@ -6,12 +6,11 @@
  * - Honest, breathable editorial layout with asymmetric metadata columns.
  */
 import { useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import {
   SearchIcon,
   ChevronDownIcon,
   CalendarIcon,
-  ClockIcon,
 } from "../../icons/index.js";
 
 export default function SidebarEditorialLedger({

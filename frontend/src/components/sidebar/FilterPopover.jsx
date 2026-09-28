@@ -223,7 +223,10 @@ export default function FilterPopover({
               }}
               className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
             >
-              {[...HORA_OPTIONS, { value: 22, label: "22:00" }].map((opt) => (
+              {Array.from({ length: 17 }, (_, i) => {
+                const value = i + 6;
+                return { value, label: `${value}:00` };
+              }).map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>

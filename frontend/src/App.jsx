@@ -1,16 +1,25 @@
 import { useLayoutEffect } from "react";
 import { Toaster } from "react-hot-toast";
 import "./App.css";
-import Sidebar from "./components/Sidebar";
+import Sidebar from "./components/sidebar";
 import LoginSidebar from "./components/LoginSidebar";
-import Schedule from "./components/Schedule";
+import Schedule from "./components/schedule";
 import MobileScheduleView from "./components/mobile/MobileScheduleView";
 import Background from "./components/Background";
 import { useMateriasStore } from "./store/materiasStore";
 
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA !== "false";
+
 function App() {
-  const { materias, darkTheme, mobileActiveView } = useMateriasStore();
+  const { materias, darkTheme, mobileActiveView, clearMaterias } =
+    useMateriasStore();
   const hasMaterias = materias && materias.length > 0;
+
+  useLayoutEffect(() => {
+    if (USE_MOCK_DATA) {
+      clearMaterias();
+    }
+  }, [clearMaterias]);
 
   // Aplicar/remover clase dark del documento síncronamente antes del paint
   useLayoutEffect(() => {

@@ -8,10 +8,10 @@ export default function ConfirmModeModal({
   onConfirm,
   onCancel,
 }) {
-  if (!isOpen || typeof document === "undefined") return null;
-
   const { materiasSeleccionadas = {}, horariosGenerados = [] } =
     useMateriasStore();
+
+  if (!isOpen || typeof document === "undefined") return null;
 
   const scheduleCount = horariosGenerados.length;
   const count =

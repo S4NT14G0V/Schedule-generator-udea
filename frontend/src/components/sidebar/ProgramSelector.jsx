@@ -7,16 +7,35 @@ import {
   getHorarios,
 } from "../../services/horarios.js";
 import { useMateriasStore } from "../../store/materiasStore.js";
+import { MOCK_DATA } from "../../data/mockMaterias.js";
+
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA !== "false";
+const MOCK_FACULTADES = [
+  { value: MOCK_DATA.facultad, label: MOCK_DATA.facultad },
+];
+const MOCK_PROGRAMAS = [
+  { value: MOCK_DATA.programa.codigo, label: MOCK_DATA.programa.nombre },
+];
 
 export default function ProgramSelector({ onMenuOpenChange }) {
   // Inicializar estado directamente desde localStorage si existe
-  const [facultades, setFacultades] = useState([]);
-  const [programas, setProgramas] = useState([]);
+  const [facultades, setFacultades] = useState(
+    USE_MOCK_DATA ? MOCK_FACULTADES : [],
+  );
+  const [programas, setProgramas] = useState(
+    USE_MOCK_DATA ? MOCK_PROGRAMAS : [],
+  );
   const [selectedFacultad, setSelectedFacultad] = useState(
-    () => localStorage.getItem("selectedFacultad") || ""
+    () =>
+      USE_MOCK_DATA
+        ? MOCK_DATA.facultad
+        : localStorage.getItem("selectedFacultad") || "",
   );
   const [selectedPrograma, setSelectedPrograma] = useState(
-    () => localStorage.getItem("selectedPrograma") || ""
+    () =>
+      USE_MOCK_DATA
+        ? MOCK_DATA.programa.codigo
+        : localStorage.getItem("selectedPrograma") || "",
   );
 
   const [isLoadingFacultades, setIsLoadingFacultades] = useState(false);
@@ -32,13 +51,15 @@ export default function ProgramSelector({ onMenuOpenChange }) {
 
   // 1. Cargar facultades al montar el componente
   useEffect(() => {
+    if (USE_MOCK_DATA) return undefined;
+
     let isMounted = true;
     const loadFacultades = async () => {
       try {
         setIsLoadingFacultades(true);
         const data = await getFacultades();
         if (isMounted) setFacultades(data || []);
-      } catch (error) {
+      } catch {
         toast.error("Error al cargar facultades");
       } finally {
         if (isMounted) setIsLoadingFacultades(false);
@@ -52,6 +73,11 @@ export default function ProgramSelector({ onMenuOpenChange }) {
 
   // 2. Cargar programas cuando cambia la facultad
   useEffect(() => {
+    if (USE_MOCK_DATA) {
+      setProgramas(MOCK_PROGRAMAS);
+      return undefined;
+    }
+
     if (!selectedFacultad) {
       setProgramas([]);
       setSelectedPrograma("");
@@ -65,7 +91,7 @@ export default function ProgramSelector({ onMenuOpenChange }) {
         setIsLoadingProgramas(true);
         const data = await getProgramas(selectedFacultad);
         if (isMounted) setProgramas(data || []);
-      } catch (error) {
+      } catch {
         toast.error("Error al cargar programas");
         if (isMounted) setProgramas([]);
       } finally {
@@ -105,6 +131,16 @@ export default function ProgramSelector({ onMenuOpenChange }) {
 
     try {
       setIsScraping(true);
+
+      if (USE_MOCK_DATA) {
+        setMateriasData(MOCK_DATA);
+        resetMateriasSeleccionadas();
+        clearHorariosGenerados();
+        toast.success(`Se cargaron ${MOCK_DATA.materias.length} materias mock`, {
+          duration: 3500,
+        });
+        return;
+      }
 
       const facultadObj = facultades.find((f) => f.value === selectedFacultad);
       const programaObj = programas.find((p) => p.value === selectedPrograma);

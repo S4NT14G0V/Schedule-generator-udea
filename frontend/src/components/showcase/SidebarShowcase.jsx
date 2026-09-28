@@ -4,7 +4,7 @@ import { MOCK_MATERIAS } from "./mockData.js";
 import SidebarEditorialLedger from "./SidebarLinearMinimal.jsx";
 import SidebarWorkbench from "./SidebarTabbedStudio.jsx";
 import SidebarStudioIndex from "./SidebarCompactPro.jsx";
-import Schedule from "../Schedule.jsx";
+import Schedule from "../schedule.jsx";
 import { useMateriasStore } from "../../store/materiasStore.js";
 
 export default function SidebarShowcase({
