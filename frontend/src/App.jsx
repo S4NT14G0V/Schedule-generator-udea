@@ -1,12 +1,11 @@
 import { useLayoutEffect } from "react";
 import { Toaster } from "react-hot-toast";
 import "./App.css";
-import Sidebar from "./components/sidebar";
-import LoginSidebar from "./components/LoginSidebar";
-import Schedule from "./components/schedule";
-import MobileScheduleView from "./components/mobile/MobileScheduleView";
-import Background from "./components/Background";
-import { useMateriasStore } from "./store/materiasStore";
+import Sidebar from "@/features/sidebar";
+import { LoginSidebar, Background } from "@/features/auth";
+import Schedule from "@/features/schedule";
+import MobileScheduleView from "@/features/mobile";
+import { useMateriasStore } from "@/store/materias.store.js";
 
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA !== "false";
 
@@ -31,7 +30,7 @@ function App() {
   }, [darkTheme]);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden relative">
+    <div className="flex h-full w-full overflow-hidden relative">
       <Toaster
         position="top-center"
         gutter={10}
@@ -76,7 +75,7 @@ function App() {
       {!hasMaterias ? (
         <>
           {/* Fondo / Dither a la izquierda en el login */}
-          <div className="hidden sm:block sm:flex-1 h-dvh overflow-hidden">
+          <div className="hidden sm:block sm:flex-1 h-full overflow-hidden">
             <Background />
           </div>
 
@@ -86,15 +85,15 @@ function App() {
       ) : (
         <>
           {/* Vista Desktop (Lado a lado intacto) */}
-          <div className="hidden sm:flex h-screen w-screen overflow-hidden">
+          <div className="hidden sm:flex h-full w-full overflow-hidden">
             <Sidebar />
-            <div className="flex-1 h-dvh overflow-auto">
+            <div className="flex-1 h-full overflow-auto">
               <Schedule />
             </div>
           </div>
 
           {/* Vista Mobile (Pantalla completa alternando entre Sidebar y MobileScheduleView sin perder estado) */}
-          <div className="sm:hidden h-dvh w-screen overflow-hidden flex flex-col relative">
+          <div className="sm:hidden h-full w-full overflow-hidden flex flex-col relative">
             <div
               className={`h-full w-full ${
                 mobileActiveView === "sidebar" ? "flex flex-col" : "hidden"
